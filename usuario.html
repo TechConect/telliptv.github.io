@@ -315,7 +315,7 @@
                             <span class="text-slate-500">${id} | Venc: ${c.validade || '--'}</span>
                         </div>
                         <div class="flex gap-2">
-                            <button onclick="event.stopPropagation(); renovarRapido('${id}')" class="bg-blue-600/20 text-blue-500 p-2 rounded-xl hover:bg-blue-600 hover:text-white transition-all" title="Renovar +30 Dias">
+                            <button onclick="event.stopPropagation(); renovarRapido('${id}')" class="bg-blue-600/20 text-blue-500 p-2 rounded-xl hover:bg-blue-600 hover:text-white transition-all" title="Renovar +31 Dias">
                                 <i class="fas fa-bolt"></i>
                             </button>
                             <button onclick="event.stopPropagation(); if(confirm('Excluir?')) db.ref('clientes/${id}').remove()" class="bg-red-600/10 text-red-500 p-2 rounded-xl hover:bg-red-600 hover:text-white transition-all">
