@@ -276,10 +276,10 @@
 
         function renovarRapido(id) {
             const c = todosClientesAdmin[id];
-            if(!confirm(`Deseja renovar ${c.nome} por mais 30 dias?`)) return;
+            if(!confirm(`Deseja renovar ${c.nome} por mais 31 dias?`)) return;
 
             const hoje = new Date();
-            hoje.setDate(hoje.getDate() + 30);
+            hoje.setDate(hoje.getDate() + 31);
             const dia = String(hoje.getDate()).padStart(2, '0');
             const mes = String(hoje.getMonth() + 1).padStart(2, '0');
             const ano = hoje.getFullYear();
