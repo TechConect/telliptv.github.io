@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel TELLIPTV Cloud</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Firebase Legacy SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <style>
+        .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+        .scrollbar-thin::-webkit-scrollbar-track { background: #0f172a; }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+        .animate-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .pix-icon { vertical-align: middle; width: 1.2em; height: 1.2em; display: inline-block; fill: currentColor; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200 min-h-screen font-sans">
+
+    <div class="max-w-6xl mx-auto p-4">
+        <!-- NAVEGAÇÃO -->
+        <div class="flex justify-center gap-8 mb-8 border-b border-slate-900 max-w-md mx-auto">
+            <button onclick="location.reload()" class="pb-3 text-xs font-bold uppercase tracking-widest border-b-2 border-blue-600 text-blue-500">Consultar</button>
+            <button onclick="showTab('admin')" class="pb-3 text-xs font-bold uppercase tracking-widest text-slate-600 hover:text-white transition-all">Administrar 🔐</button>
+        </div>
+
+        <!-- ABA CLIENTE -->
+        <div id="tab-cliente" class="block text-center max-w-md mx-auto">
+            <h1 class="text-4xl font-black text-blue-500 italic mb-8 uppercase">TELL<span class="text-white">IPTV</span></h1>
+            
+            <!-- BUSCA -->
+            <div id="busca-area" class="bg-slate-900/50 border border-slate-800 p-8 rounded-3xl shadow-2xl">
+                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4">Encontre seu cadastro</p>
+                <input type="text" id="input_busca" onkeyup="buscarSugestoes()" class="w-full bg-slate-900 border-2 border-slate-800 p-4 rounded-2xl mb-4 text-center text-lg font-bold outline-none uppercase focus:border-blue-600 transition-all" placeholder="NOME OU USUÁRIO">
+                <div id="multiplos-resultados" class="hidden mt-2 space-y-2 text-left max-h-60 overflow-y-auto pr-2 scrollbar-thin">
+                    <div id="lista-escolha" class="space-y-2"></div>
+                </div>
+            </div>
+
+            <!-- PIN DE SEGURANÇA -->
+            <div id="verificacao-area" class="hidden bg-slate-900 border border-blue-500/30 p-8 rounded-3xl shadow-2xl animate-in">
+                <i class="fas fa-shield-alt text-4xl text-blue-500 mb-4"></i>
+                <h2 class="text-xl font-black uppercase mb-2">Segurança</h2>
+                <p class="text-slate-400 text-xs mb-6">Digite os <b>4 últimos dígitos</b> do seu WhatsApp cadastrado:</p>
+                <input type="password" id="input_pin" maxlength="4" inputmode="numeric" class="w-32 bg-slate-950 border-2 border-slate-800 p-4 rounded-2xl mb-6 text-center text-2xl font-black tracking-[0.5em] outline-none focus:border-blue-500">
+                <button onclick="validarPin()" class="w-full bg-blue-600 py-4 rounded-2xl font-black uppercase shadow-lg shadow-blue-900/40">Confirmar</button>
+                <button onclick="voltarBusca()" class="mt-4 text-slate-500 text-[10px] font-bold uppercase tracking-widest hover:text-white">Voltar</button>
+            </div>
+
+            <!-- RESULTADO DA CONSULTA -->
+            <div id="resultado-area" class="hidden space-y-4 animate-in">
+                <div id="status_card" class="p-6 rounded-3xl border text-center">
+                    <p id="res_nome" class="text-3xl font-black uppercase mb-1 tracking-tighter"></p>
+                    <p id="res_status_texto" class="text-[10px] font-black uppercase tracking-widest"></p>
+                    <p id="res_val" class="text-xs font-bold mt-1 opacity-80"></p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 text-left">
+                    <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl col-span-2 flex justify-between items-center">
+                        <div><p class="text-[9px] text-slate-500 uppercase font-black">Usuário</p><p id="res_user_display" class="text-lg font-mono font-bold text-white uppercase"></p></div>
+                        <button onclick="copiarTexto('res_user_display')" class="bg-blue-600/20 text-blue-400 p-3 rounded-xl"><i class="fas fa-copy"></i></button>
+                    </div>
+                    <div class="bg-slate-900 border border-green-500/30 p-4 rounded-2xl col-span-2 flex justify-between items-center">
+                        <div><p class="text-[9px] text-slate-500 uppercase font-black">Senha de Acesso</p><p id="res_senha" class="text-xl font-mono font-bold text-green-400 tracking-widest uppercase"></p></div>
+                        <button onclick="copiarTexto('res_senha')" class="bg-green-600/20 text-green-400 p-3 rounded-xl"><i class="fas fa-copy"></i></button>
+                    </div>
+                </div>
+
+                <!-- PAGAMENTO -->
+                <div class="bg-slate-900/80 p-6 rounded-3xl border border-slate-800 text-center">
+                    <div class="flex justify-center mb-6">
+                        <div class="bg-white p-4 rounded-3xl inline-block border-2 border-[#32BCAD]/20 shadow-xl">
+                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=00020126580014BR.GOV.BCB.PIX0136c2905b73-ff28-4a61-9c59-8c60e699a03f5204000053039865802BR5925Wallace Cesar Reis Medeir6009SAO PAULO62140510BaHJ6XmIR06304DE30" class="w-44 h-44" alt="QR Code Pix">
+                        </div>
+                    </div>
+                    <div class="mb-6 bg-slate-950/50 py-4 rounded-2xl border border-slate-800">
+                        <p class="text-slate-500 text-[10px] font-bold uppercase mb-1">Total a Pagar</p>
+                        <p class="text-[#32BCAD] text-5xl font-black tracking-tighter" id="res_valor">R$ 0,00</p>
+                    </div>
+                    <button onclick="copiarPixCopiaCola()" class="w-full bg-[#32BCAD] text-slate-950 text-[11px] font-black py-4 rounded-2xl uppercase shadow-xl mb-3 flex items-center justify-center gap-2">
+                        <svg class="pix-icon" viewBox="0 0 512 512"><path d="M110.5 137.2L204.6 43.1c32.1-32.1 84.1-32.1 116.2 0l94.1 94.1L320.8 231.3l-64.8-64.8L191.2 231.3l-80.7-94.1zM43.1 204.6l94.1-94.1 94.1 94.1-94.1 94.1-94.1-94.1zm331.7-94.1l94.1 94.1-94.1 94.1-94.1-94.1 94.1-94.1zM256 306.7l64.8-64.8 94.1 94.1-94.1 94.1-116.2 0-94.1-94.1 94.1-94.1 51.4 64.8zm-15.4 61.1c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0z"/></svg>
+                        Copiar Pix Copia e Cola
+                    </button>
+                    <button onclick="navigator.clipboard.writeText('21984840375'); alert('Chave PIX Copiada!')" class="w-full bg-slate-800 text-slate-400 text-[10px] font-bold py-3 rounded-2xl border border-slate-700 uppercase">Chave: (21) 98484-0375</button>
+                </div>
+
+                <a id="link_matrix_btn" href="#" target="_blank" class="w-full bg-blue-600/10 border border-blue-600/30 text-blue-400 py-5 rounded-2xl font-black flex items-center justify-center gap-3 uppercase text-sm hover:bg-blue-600 hover:text-white transition-all"><i class="fas fa-sync-alt"></i> RENOVAR VIA MATRIX</a>
+                <button onclick="enviarComprovante()" class="w-full bg-green-600 py-5 rounded-2xl font-black flex items-center justify-center gap-3 uppercase text-sm shadow-lg"><i class="fab fa-whatsapp text-xl"></i> Enviar Comprovante</button>
+                <button onclick="location.reload()" class="w-full mt-4 text-slate-600 text-[10px] font-bold uppercase tracking-[0.3em] py-4 hover:text-white transition-all underline decoration-blue-600 underline-offset-8">Sair / Nova Consulta</button>
+            </div>
+        </div>
+
+        <!-- ABA ADMIN -->
+        <div id="tab-admin" class="hidden">
+            <div id="login-admin" class="bg-slate-900/50 p-8 rounded-3xl text-center max-w-md mx-auto">
+                <input type="password" id="pass_admin" class="w-full bg-slate-900 border border-slate-800 p-4 rounded-2xl mb-4 text-center font-bold" placeholder="SENHA ADMIN">
+                <button onclick="autenticarAdmin()" class="w-full bg-white text-black py-4 rounded-2xl font-black uppercase">Entrar</button>
+            </div>
+
+            <div id="painel-admin" class="hidden">
+                <!-- INDICADORES -->
+                <div class="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-slate-900 border border-blue-500/30 p-4 rounded-3xl flex items-center gap-4">
+                        <div class="bg-blue-600/20 p-3 rounded-2xl text-blue-500"><i class="fas fa-users text-xl"></i></div>
+                        <div><p class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Geral</p><p id="total_clientes" class="text-2xl font-black text-white">0</p></div>
+                    </div>
+                    <div class="bg-slate-900 border border-green-500/30 p-4 rounded-3xl flex items-center gap-4">
+                        <div class="bg-green-600/20 p-3 rounded-2xl text-green-500"><i class="fas fa-check-circle text-xl"></i></div>
+                        <div><p class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Ativos</p><p id="total_ativos" class="text-2xl font-black text-green-400">0</p></div>
+                    </div>
+                    <div class="bg-slate-900 border border-red-500/30 p-4 rounded-3xl flex items-center gap-4">
+                        <div class="bg-red-600/20 p-3 rounded-2xl text-red-500"><i class="fas fa-clock text-xl"></i></div>
+                        <div><p class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Vencidos</p><p id="total_vencidos" class="text-2xl font-black text-red-500">0</p></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <!-- CADASTRO -->
+                    <div class="lg:col-span-5">
+                        <div class="bg-slate-900 p-6 rounded-3xl border border-blue-500/20">
+                            <h3 class="text-blue-500 font-black uppercase text-[10px] mb-4 tracking-widest border-b border-slate-800 pb-2">Configuração ☁️</h3>
+                            <div class="space-y-3">
+                                <input type="text" id="cad_user" placeholder="USUÁRIO IPTV" class="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-sm uppercase">
+                                <input type="text" id="cad_senha" placeholder="SENHA" class="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-sm">
+                                <input type="text" id="cad_nome" placeholder="NOME DO CLIENTE" class="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-sm uppercase">
+                                <input type="text" id="cad_whats" placeholder="WHATSAPP (COM DDD)" class="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-sm">
+                                <input type="text" id="cad_val" maxlength="10" oninput="mascaraData(this)" placeholder="VALIDADE (DD/MM/AAAA)" class="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-sm">
+                                <input type="text" id="cad_valor" placeholder="VALOR" class="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-sm">
+                                <input type="text" id="cad_link" placeholder="LINK MATRIX" class="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-sm">
+                                <button onclick="salvarNovoCliente()" class="w-full bg-blue-600 py-4 rounded-xl font-black uppercase text-xs">Sincronizar</button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- LISTA -->
+                    <div class="lg:col-span-7">
+                        <div class="bg-slate-900/50 p-4 rounded-3xl border border-slate-800">
+                            <input type="text" id="busca_admin" onkeyup="filtrarListaAdmin()" placeholder="BUSCAR NO BANCO..." class="w-full bg-slate-950 border border-slate-800 p-3 rounded-2xl text-xs uppercase mb-4 outline-none">
+                            <div id="lista-geral" class="space-y-2 max-h-[500px] overflow-y-auto pr-2 scrollbar-thin"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // CONFIGURAÇÃO FIREBASE
+        const firebaseConfig = {
+            apiKey: "AIzaSyA_Y8dJpzP1s8lbIqNRvUibegNUeAKK89Y",
+            authDomain: "telliptv.firebaseapp.com",
+            databaseURL: "https://telliptv-default-rtdb.firebaseio.com",
+            projectId: "telliptv",
+            storageBucket: "telliptv.firebasestorage.app",
+            messagingSenderId: "656589651290",
+            appId: "1:656589651290:web:79117e66709a56dc29c763"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const SENHA_MESTRE = "2198";
+        
+        let clienteTemp = null;
+        let todosClientesAdmin = {};
+
+        function showTab(tab) {
+            document.getElementById('tab-cliente').classList.toggle('hidden', tab !== 'cliente');
+            document.getElementById('tab-admin').classList.toggle('hidden', tab !== 'admin');
+        }
+
+        // LÓGICA DE CONSULTA
+        function buscarSugestoes() {
+            const busca = document.getElementById('input_busca').value.trim().toUpperCase();
+            const areaMultiplos = document.getElementById('multiplos-resultados');
+            const lista = document.getElementById('lista-escolha');
+            if(busca.length < 2) { areaMultiplos.classList.add('hidden'); return; }
+            
+            db.ref('clientes').once('value', (snapshot) => {
+                const clientes = snapshot.val();
+                let resultados = [];
+                for(let id in clientes) {
+                    const nome = (clientes[id].nome || "").toUpperCase();
+                    if(id.toUpperCase().includes(busca) || nome.includes(busca)) {
+                        resultados.push({ id, ...clientes[id] });
+                    }
+                }
+                if(resultados.length > 0) {
+                    lista.innerHTML = "";
+                    areaMultiplos.classList.remove('hidden');
+                    resultados.forEach(res => {
+                        const btn = document.createElement('button');
+                        btn.className = "w-full bg-slate-800 p-4 rounded-2xl border border-slate-700 text-left font-black uppercase text-[10px] hover:bg-blue-600 transition-all flex justify-between items-center mb-2";
+                        btn.innerHTML = `<span>${res.nome} <br><small class='opacity-50'>Usuário: ${res.id}</small></span><i class="fas fa-lock-open text-blue-400"></i>`;
+                        btn.onclick = () => prepararVerificacao(res);
+                        lista.appendChild(btn);
+                    });
+                }
+            });
+        }
+
+        function prepararVerificacao(cliente) {
+            clienteTemp = cliente;
+            const whatsBanco = cliente.whatsapp ? String(cliente.whatsapp).replace(/\D/g, '') : "";
+            if (whatsBanco.length < 4) {
+                alert("⚠️ Cadastro sem WhatsApp vinculado.");
+                return;
+            }
+            document.getElementById('busca-area').classList.add('hidden');
+            document.getElementById('verificacao-area').classList.remove('hidden');
+            document.getElementById('input_pin').value = "";
+            setTimeout(() => document.getElementById('input_pin').focus(), 100);
+        }
+
+        function validarPin() {
+            const pinDigitado = document.getElementById('input_pin').value;
+            const whatsBanco = String(clienteTemp.whatsapp).replace(/\D/g, '');
+            if(pinDigitado === whatsBanco.slice(-4)) { exibirDadosFinais(); }
+            else { alert("❌ PIN INCORRETO!"); }
+        }
+
+        function exibirDadosFinais() {
+            document.getElementById('verificacao-area').classList.add('hidden');
+            document.getElementById('resultado-area').classList.remove('hidden');
+            document.getElementById('res_nome').innerText = clienteTemp.nome;
+            document.getElementById('res_user_display').innerText = clienteTemp.id.toUpperCase();
+            document.getElementById('res_senha').innerText = clienteTemp.senha || "---";
+            document.getElementById('res_valor').innerText = "R$ " + (clienteTemp.valor || "0,00");
+            document.getElementById('res_val').innerText = "VENCIMENTO: " + (clienteTemp.validade || "--/--/----");
+            document.getElementById('link_matrix_btn').href = clienteTemp.link || "#";
+            verificarValidade(clienteTemp.validade);
+        }
+
+        function verificarValidade(dataStr) {
+            if(!dataStr) return;
+            const partes = dataStr.split('/');
+            const dV = new Date(partes[2], partes[1]-1, partes[0]);
+            const hoje = new Date(); hoje.setHours(0,0,0,0);
+            const card = document.getElementById('status_card');
+            const txt = document.getElementById('res_status_texto');
+            if(dV >= hoje) { 
+                card.className = "p-6 rounded-3xl border-2 border-green-500 bg-green-500/10 text-green-500"; 
+                txt.innerText = "ACESSO ATIVO ✅"; 
+            } else { 
+                card.className = "p-6 rounded-3xl border-2 border-red-500 bg-red-500/10 text-red-500"; 
+                txt.innerText = "ACESSO VENCIDO ⚠️"; 
+            }
+        }
+
+        // LÓGICA ADMINISTRATIVA
+        function autenticarAdmin() {
+            if(document.getElementById('pass_admin').value === SENHA_MESTRE) {
+                document.getElementById('login-admin').classList.add('hidden');
+                document.getElementById('painel-admin').classList.remove('hidden');
+                db.ref('clientes').on('value', (s) => { 
+                    todosClientesAdmin = s.val() || {}; 
+                    atualizarContadores();
+                    filtrarListaAdmin(); 
+                });
+            } else { alert("Senha incorreta!"); }
+        }
+
+        function atualizarContadores() {
+            let ativos = 0;
+            let vencidos = 0;
+            const hoje = new Date(); hoje.setHours(0,0,0,0);
+
+            for(let id in todosClientesAdmin) {
+                const dataStr = todosClientesAdmin[id].validade;
+                if(dataStr) {
+                    const partes = dataStr.split('/');
+                    const dV = new Date(partes[2], partes[1]-1, partes[0]);
+                    if(dV >= hoje) { ativos++; } else { vencidos++; }
+                } else { vencidos++; }
+            }
+            document.getElementById('total_clientes').innerText = Object.keys(todosClientesAdmin).length;
+            document.getElementById('total_ativos').innerText = ativos;
+            document.getElementById('total_vencidos').innerText = vencidos;
+        }
+
+        function salvarNovoCliente() {
+            const user = document.getElementById('cad_user').value.trim().toUpperCase();
+            if(!user) return;
+            db.ref('clientes/' + user).set({
+                nome: document.getElementById('cad_nome').value.toUpperCase(),
+                senha: document.getElementById('cad_senha').value,
+                whatsapp: document.getElementById('cad_whats').value.replace(/\D/g,''),
+                validade: document.getElementById('cad_val').value,
+                valor: document.getElementById('cad_valor').value,
+                link: document.getElementById('cad_link').value
+            }).then(() => { alert("Sincronizado!"); limparCampos(); });
+        }
+
+        function filtrarListaAdmin() {
+            const t = document.getElementById('busca_admin').value.toUpperCase();
+            const list = document.getElementById('lista-geral'); list.innerHTML = "";
+            for(let id in todosClientesAdmin) {
+                if(id.includes(t) || todosClientesAdmin[id].nome.includes(t)) {
+                    list.innerHTML += `<div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex justify-between items-center cursor-pointer mb-2" onclick="prepararEdicao('${id}')">
+                        <div class="text-[10px] font-black uppercase">${todosClientesAdmin[id].nome}<br><span class="text-slate-500">${id}</span></div>
+                        <button onclick="event.stopPropagation(); if(confirm('Excluir?')) db.ref('clientes/${id}').remove()" class="text-red-500 p-2"><i class="fas fa-trash"></i></button>
+                    </div>`;
+                }
+            }
+        }
+
+        function prepararEdicao(id) {
+            const c = todosClientesAdmin[id];
+            document.getElementById('cad_user').value = id;
+            document.getElementById('cad_nome').value = c.nome;
+            document.getElementById('cad_senha').value = c.senha;
+            document.getElementById('cad_whats').value = c.whatsapp || "";
+            document.getElementById('cad_val').value = c.validade;
+            document.getElementById('cad_valor').value = c.valor;
+            document.getElementById('cad_link').value = c.link || "";
+        }
+
+        // UTILITÁRIOS
+        function mascaraData(i) {
+            let v = i.value.replace(/\D/g, '');
+            if (v.length > 2) v = v.substring(0,2) + '/' + v.substring(2);
+            if (v.length > 5) v = v.substring(0,5) + '/' + v.substring(5,9);
+            i.value = v;
+        }
+        function limparCampos() { document.querySelectorAll('#painel-admin input:not(#busca_admin)').forEach(i => i.value = ""); }
+        function copiarTexto(id) { navigator.clipboard.writeText(document.getElementById(id).innerText); alert("Copiado!"); }
+        function copiarPixCopiaCola() {
+            const pix = "00020126580014BR.GOV.BCB.PIX0136c2905b73-ff28-4a61-9c59-8c60e699a03f5204000053039865802BR5925Wallace Cesar Reis Medeir6009SAO PAULO62140510BaHJ6XmIR06304DE30";
+            navigator.clipboard.writeText(pix);
+            alert("Pix Copiado!");
+        }
+        function enviarComprovante() { window.open(`https://wa.me/5521984840375?text=Olá Wallace, segue comprovante: ${clienteTemp.nome} (${clienteTemp.id})`, '_blank'); }
+        function voltarBusca() { document.getElementById('verificacao-area').classList.add('hidden'); document.getElementById('busca-area').classList.remove('hidden'); }
+    </script>
+</body>
+</html>
